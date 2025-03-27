@@ -1,53 +1,28 @@
-name: CI Test Pipeline 2
-
+name: CI with Docker Compose
+ 
 on:
-  push:
-      branch:
-        - main
-  pull_request:
-
+push:
+   branches:
+     - main
+pull_request:
+ 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:latest
-        env:
-          MYSQL_ROOT_PASSWORD: rootpassword
-        ports:
-          - 3306:3306
-        options: --health-cmd="mysqladmin ping -h localhost" --health-interval=10s --health-timeout=5s --health-retries=3
-    steps:
-      - name: Checkout sorce code
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-
-      - name: Install dependencies
-        run: |
-           cd app
-           pip install -r requirements.txt
-
-      - name: Set up Docker Compose
-        run: |
-          cd ..
-          docker-compose -f docker-compose.yml up -d
-
-      - name: Wait for MySQL to be ready
-        run: |
-          sleep 30
-
-      - name: Run MySQL Initialization Script
-        run: |
-          docker exec db_server mysql -u root -prootpassword unidb db/init.sql
-
-      - name: Run Flask app tests
-        run: |
-          curl http://localhost:5000/api/users
-
-      - name: Shutdown containers
-        run: |
-          docker-compose down
+docker-ci:
+   runs-on: ubuntu-latest
+ 
+   steps:
+     - name: Checkout code
+       uses: actions/checkout@v3
+ 
+     - name: Set up Docker Compose
+       run: |
+         docker compose up -d
+         echo "⏳ Waiting for containers to initialize..."
+         sleep 20
+ 
+     - name: Run test inside web container
+       run: docker compose exec -it web curl http://localhost:5000/api/users
+ 
+     - name: Shutdown Docker Compose
+       if: always()
+       run: docker compose down
