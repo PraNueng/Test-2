@@ -1,0 +1,53 @@
+name: CI Test Pipeline 2
+
+on:
+  push:
+      branch:
+        - main
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:latest
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping -h localhost" --health-interval=10s --health-timeout=5s --health-retries=3
+    steps:
+      - name: Checkout sorce code
+        users: actions/checkout@v2
+
+      - name: Set up Python
+        users: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+           cd app
+           pip install -r requirement.txt
+
+      - name: Set up Docker Compose
+        run: |
+          cd ..
+          docker-compose -f docker-compose.yml up -d
+
+      - name: Wait for MySQL to be ready
+        run: |
+          sleep 30
+
+      - name: Run MySQL Initialization Script
+        run: |
+          docker exec db_server mysql -u root -prootpassword unidb db/init.sql
+
+      - name: Run Flask app tests
+        run: |
+          curl http://localhost:5000/api/users
+
+      - name: Shutdown containers
+        run: |
+          docker-compose down
